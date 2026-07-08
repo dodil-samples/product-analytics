@@ -1,0 +1,63 @@
+name: product-analytics
+description: >
+  Mixpanel/Amplitude-style product analytics on Ignite + K3. Events (partitioned by
+  day) and users live in the K3 SQL warehouse, raw batches are archived as objects,
+  and an event catalog is semantically searchable via vector. One action-routed Deno
+  function; funnels, retention, and DAU are plain SQL.
+runtime: deno
+mcp_enabled: true
+
+input:
+  type: object
+  required: [action]
+  properties:
+    action:
+      type: string
+      # PUBLIC (anon-safe): track, track_batch, identify, catalog_search, public_overview
+      # PRIVATE (admin key): funnel, retention, active_users, top_events, breakdown,
+      #                      register_event, export, create_key, list_keys, revoke_key
+      enum: [track, track_batch, identify, catalog_search, public_overview,
+             funnel, retention, active_users, top_events, breakdown,
+             register_event, export, create_key, list_keys, revoke_key]
+    key:
+      type: string
+      description: >
+        API key in the request body. A project (public) key authorizes PUBLIC
+        actions; an admin key authorizes PRIVATE actions. Omit when the app's key
+        tiers are unconfigured (open).
+    report:
+      type: string
+      description: For action=export — which report to render as CSV.
+      enum: [top_events, active_users, breakdown, funnel, retention]
+    name: { type: string }
+    user_id: { type: string }
+    props: { type: object }
+    events: { type: array }
+    steps: { type: array, items: { type: string } }
+    event: { type: string }
+    property: { type: string }
+    query: { type: string }
+
+output:
+  type: object
+  properties:
+    ok: { type: boolean }
+    action: { type: string }
+    result: { type: object }
+
+env:
+  - DODIL_SA_ID
+  - DODIL_SA_SECRET
+  # Public/private gate (see lib/gate.ts). Comma-separated. If a tier has no key
+  # configured (env + api_keys table both empty), that tier is open.
+  - ADMIN_KEYS      # authorizes PRIVATE actions (analytics reads, admin, key mgmt)
+  - PUBLIC_KEYS     # authorizes PUBLIC actions (ingest); the project write key
+  - PUBLIC_FUNNEL   # optional: comma-separated step names for public_overview's funnel
+
+test_input:
+  action: track
+  name: checkout_completed
+  user_id: u_42
+  props:
+    amount: 129
+    currency: USD

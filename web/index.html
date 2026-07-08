@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Product Analytics — dashboard</title>
+<style>
+  :root {
+    --surface:#fcfcfb; --plane:#f9f9f7; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --accent:#2a78d6; --accent-soft:#cde2fb;
+    --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+    --border:rgba(11,11,11,0.10);
+    --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface:#1a1a19; --plane:#0d0d0d; --ink:#fff; --ink2:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --accent:#3987e5; --accent-soft:#184f95;
+      --border:rgba(255,255,255,0.10);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--plane); color:var(--ink); font-family:var(--font);
+         font-size:14px; line-height:1.5; }
+  a { color:var(--accent); }
+  .wrap { max-width:980px; margin:0 auto; padding:20px 16px 64px; }
+  header.top { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+               padding-bottom:12px; border-bottom:1px solid var(--border); margin-bottom:20px; }
+  header.top h1 { font-size:18px; margin:0; font-weight:700; }
+  .badge { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border);
+           color:var(--ink2); background:var(--surface); }
+  .badge.anon { color:var(--good); border-color:color-mix(in srgb, var(--good) 40%, transparent); }
+  .spacer { flex:1; }
+  button, input, select { font-family:var(--font); font-size:13px; }
+  button { cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--ink);
+           padding:7px 12px; border-radius:8px; }
+  button.primary { background:var(--accent); color:#fff; border-color:transparent; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  input, select { background:var(--surface); color:var(--ink); border:1px solid var(--border);
+                  border-radius:8px; padding:7px 10px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px;
+          padding:16px; margin-bottom:16px; }
+  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
+             margin:0 0 12px; font-weight:600; }
+  .card h2 .sub { text-transform:none; letter-spacing:0; color:var(--ink2); font-weight:400; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; }
+  .tile { background:var(--plane); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+  .tile .v { font-size:26px; font-weight:700; }
+  .tile .l { font-size:12px; color:var(--muted); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .row.form > * { flex:0 0 auto; }
+  .grow { flex:1 1 160px; min-width:120px; }
+  .bars { display:flex; flex-direction:column; gap:7px; }
+  .bar-row { display:grid; grid-template-columns:150px 1fr auto; gap:10px; align-items:center; }
+  .bar-row .name { color:var(--ink2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bar-track { background:var(--plane); border-radius:5px; height:18px; overflow:hidden; }
+  .bar-fill { height:100%; background:var(--accent); border-radius:5px; min-width:2px; }
+  .bar-row .val { font-variant-numeric:tabular-nums; color:var(--ink2); font-size:12px; }
+  .muted { color:var(--muted); }
+  .err { color:var(--crit); }
+  .ok { color:var(--good); }
+  pre.out { background:var(--plane); border:1px solid var(--border); border-radius:8px;
+            padding:10px; overflow:auto; font-size:12px; max-height:220px; margin:8px 0 0; }
+  .hidden { display:none; }
+  svg .grid { stroke:var(--grid); stroke-width:1; }
+  svg .axis { stroke:var(--axis); stroke-width:1; }
+  svg .area { fill:var(--accent); opacity:.12; }
+  svg .line { fill:none; stroke:var(--accent); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
+  svg .dot { fill:var(--accent); }
+  svg text { fill:var(--muted); font-size:10px; }
+  .tt { position:fixed; pointer-events:none; background:var(--ink); color:var(--surface);
+        padding:4px 8px; border-radius:6px; font-size:12px; opacity:0; transition:opacity .1s; z-index:9; }
+  label.fld { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted); }
+  .settings { display:none; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .settings.open { display:flex; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Product Analytics</h1>
+    <span class="badge anon" id="modeBadge">public · anon invocation</span>
+    <span class="spacer"></span>
+    <button id="gear" title="Connection settings">⚙ Settings</button>
+  </header>
+
+  <div class="settings card" id="settings">
+    <label class="fld grow">App URL (anon FQDN)
+      <input id="cfgUrl" placeholder="https://product-analytics-ORG.ignite.dodil.cloud/" />
+    </label>
+    <label class="fld grow">Project key (public)
+      <input id="cfgPk" placeholder="pk_… (optional)" />
+    </label>
+    <label class="fld grow">Admin key (private)
+      <input id="cfgAk" type="password" placeholder="ak_… unlocks admin reports" />
+    </label>
+    <div class="row" style="align-items:flex-end">
+      <button class="primary" id="cfgSave">Save</button>
+    </div>
+  </div>
+
+  <!-- PUBLIC overview -->
+  <section class="card">
+    <h2>Live overview <span class="sub">— public_overview, no credentials</span></h2>
+    <div class="tiles" id="tiles"><span class="muted">Loading…</span></div>
+    <div style="margin-top:18px">
+      <div class="muted" style="font-size:12px;margin-bottom:6px">Daily active users</div>
+      <div id="dau"></div>
+    </div>
+    <div style="margin-top:18px">
+      <div class="muted" style="font-size:12px;margin-bottom:6px">Top events</div>
+      <div class="bars" id="topEvents"></div>
+    </div>
+    <div id="funnelWrap" class="hidden" style="margin-top:18px">
+      <div class="muted" style="font-size:12px;margin-bottom:6px">Headline funnel</div>
+      <div class="bars" id="funnel"></div>
+    </div>
+  </section>
+
+  <!-- PUBLIC ingestion -->
+  <section class="card">
+    <h2>Send a test event <span class="sub">— public track (the CRM / website / email path)</span></h2>
+    <div class="row form">
+      <input id="evName" class="grow" placeholder="event name (e.g. checkout_completed)" value="demo_click" />
+      <input id="evUser" placeholder="user_id" value="u_demo" />
+      <input id="evProp" placeholder="plan (a prop)" value="pro" />
+      <button class="primary" id="evSend">Track</button>
+    </div>
+    <pre class="out hidden" id="evOut"></pre>
+  </section>
+
+  <!-- PRIVATE reports -->
+  <section class="card">
+    <h2>Admin reports <span class="sub">— private, admin key required</span></h2>
+    <div class="row form">
+      <button data-report="funnel">Funnel</button>
+      <button data-report="retention">Retention</button>
+      <button data-report="top_events">Top events</button>
+      <button data-report="active_users">Active users</button>
+      <span class="muted" id="adminHint">Set an admin key in ⚙ Settings to unlock.</span>
+    </div>
+    <pre class="out hidden" id="reportOut"></pre>
+  </section>
+
+  <p class="muted" style="font-size:12px">
+    Every call on this page is an anonymous POST straight to the app's public FQDN
+    (<code id="urlEcho"></code>). Public actions need at most a project key; admin
+    reports require an admin key — the gate is enforced in the app. Email open/click
+    pixels for CRM tracking run through <code>web/collector.mjs</code>.
+  </p>
+</div>
+<div class="tt" id="tt"></div>
+<script src="./app.js"></script>
+</body>
+</html>
