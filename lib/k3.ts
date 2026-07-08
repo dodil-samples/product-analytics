@@ -45,6 +45,12 @@ export class K3Error extends Error {}
 // and was what let register_event blow the 120s function limit.
 const DEFAULT_TIMEOUT_MS = Number(Deno.env.get("K3_TIMEOUT_MS") ?? "15000");
 const PROVISION_TIMEOUT_MS = 8000;
+// Vector search embeds the query (model inference, ~0.7s warm) and can hit a Milvus
+// cold segment-load (~5-10s) on an idle collection, so it needs more headroom than a
+// plain table read. We also retry it once: a cold-load / briefly-saturated-embedder
+// first attempt usually warms things so the second returns fast.
+const VECTOR_TIMEOUT_MS = Number(Deno.env.get("K3_VECTOR_TIMEOUT_MS") ?? "20000");
+const VECTOR_ATTEMPTS = 2;
 
 function fetchT(url: string, init: RequestInit, timeoutMs: number, budget?: AbortSignal): Promise<Response> {
   const perCall = AbortSignal.timeout(timeoutMs);
@@ -225,22 +231,31 @@ export class K3 {
 
   async vectorSearch(query: string, topK = 5): Promise<Array<Record<string, unknown>>> {
     // Best-effort: degrade to [] instead of throwing if the embedder is down or slow.
-    try {
-      const resp = await fetchT(`${BASE}/${this.bucket}/vector/search`, {
-        method: "POST",
-        headers: await this.headers(),
-        body: JSON.stringify({ bucket: this.bucket, text: query, top_k: topK, include_content: true }),
-      }, DEFAULT_TIMEOUT_MS);
-      if (!resp.ok) return [];
-      const data = await resp.json().catch(() => ({}));
-      return (data.results ?? []).map((m: any) => ({
-        text: (m.content ?? m.text ?? m.key ?? "").trim(),
-        key: m.key,
-        score: m.score,
-      }));
-    } catch {
-      return [];
+    // Retry once on a failed/slow first attempt (see VECTOR_TIMEOUT_MS) — the retry
+    // rides a now-warm segment/embedder and returns quickly.
+    for (let attempt = 1; attempt <= VECTOR_ATTEMPTS; attempt++) {
+      try {
+        const resp = await fetchT(`${BASE}/${this.bucket}/vector/search`, {
+          method: "POST",
+          headers: await this.headers(),
+          body: JSON.stringify({ bucket: this.bucket, text: query, top_k: topK, include_content: true }),
+        }, VECTOR_TIMEOUT_MS);
+        if (!resp.ok) {
+          if (attempt < VECTOR_ATTEMPTS) continue;
+          return [];
+        }
+        const data = await resp.json().catch(() => ({}));
+        return (data.results ?? []).map((m: any) => ({
+          text: (m.content ?? m.text ?? m.key ?? "").trim(),
+          key: m.key,
+          score: m.score,
+        }));
+      } catch {
+        if (attempt < VECTOR_ATTEMPTS) continue; // timeout/abort — one more try
+        return [];
+      }
     }
+    return [];
   }
 }
 
