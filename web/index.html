@@ -60,7 +60,9 @@
   .err { color:var(--crit); }
   .ok { color:var(--good); }
   pre.out { background:var(--plane); border:1px solid var(--border); border-radius:8px;
-            padding:10px; overflow:auto; font-size:12px; max-height:220px; margin:8px 0 0; }
+            padding:10px; overflow:auto; font-size:12px; max-height:220px; margin:8px 0 0;
+            white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere; }
+  .row { min-width:0; } .grow { min-width:0; }
   .hidden { display:none; }
   svg .grid { stroke:var(--grid); stroke-width:1; }
   svg .axis { stroke:var(--axis); stroke-width:1; }
