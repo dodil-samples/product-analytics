@@ -59,6 +59,10 @@ async function serveStatic(res, urlPath) {
 
 createServer(async (req, res) => {
   const u = new URL(req.url, `http://localhost:${PORT}`);
+  if (u.pathname === "/healthz") { // Ignite BYOI readiness/liveness probe
+    res.writeHead(200, { "content-type": "text/plain" });
+    return res.end("ok");
+  }
   if (u.pathname === "/px.gif") {
     track(u.searchParams); // fire-and-forget
     res.writeHead(200, { "content-type": "image/gif", "cache-control": "no-store" });

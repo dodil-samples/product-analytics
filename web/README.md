@@ -39,6 +39,24 @@ index.html?app=https://product-analytics-<org>.ignite.dodil.cloud/&pk=pk_xxx&ak=
 The defaults in `app.js` target the `cardinalai` dev deployment; change `DEFAULTS`
 or use Settings for your own.
 
+## Host it on Ignite too (BYOI)
+
+The same folder ships a `Dockerfile` so the dashboard can run **on Ignite** as a
+bring-your-own-image app with its own public URL — the `collector.mjs` static
+server on `$PORT`, answering `GET /healthz` for the readiness probe:
+
+```bash
+dodil ignite app deploy product-analytics-ui --code ./web --dockerfile-path Dockerfile \
+  --allow-unauthenticated --tier small \
+  --env APP_URL=https://product-analytics-<org>.ignite.dodil.cloud/
+```
+
+Live example: **https://product-analytics-ui-cardinalai.ignite.dodil.cloud/**
+
+Note the `Dockerfile` uses a **numeric** `USER 1000` (not `USER node`): Ignite runs
+pods `runAsNonRoot`, and Kubernetes rejects a *named* user with
+`CreateContainerConfigError` ("cannot verify user is non-root").
+
 ## Email / CRM tracking pixel (`collector.mjs`)
 
 The anon FQDN routes `POST` bodies to the handler but answers a bare `GET` with a
