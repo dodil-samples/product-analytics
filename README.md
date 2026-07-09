@@ -16,15 +16,19 @@ breakdown — is a **SQL query over the K3 warehouse**; no separate analytics DB
 
 ```
 invoke ──► main.ts  ─► start(handle)              (Deno "ignite" SDK entrypoint)
-             lib/handler.ts   router on `action`
+             handler.ts   parse → bootstrap → gate → dispatch
+               ├─ actions/    the product, one file per domain (maps 1:1 to the actions table):
+               │    common.ts (helpers + ingest) · ingest.ts · reports.ts · catalog.ts · mod.ts (registry)
                ├─ lib/auth.ts     service account ─► bearer (OIDC client_credentials)
                ├─ lib/k3.ts       objects · tables (_execute/insert) · vector — fetch only
                ├─ lib/models.ts   /v1/embeddings · /v1/chat/completions
+               ├─ lib/gate.ts     public/private tiers + API-key management
                └─ lib/bootstrap.ts idempotent bucket + events/users tables + catalog
 ```
 
-Everything in `lib/` uses only web-standard `fetch`, so the logic runs under plain
-`deno run` (see `smoke.ts`); `main.ts` is the only file that needs the platform SDK.
+`actions/` = WHAT the product does, `lib/` = HOW it talks to K3/models/the gate.
+Everything uses only web-standard `fetch`, so the logic runs under plain `deno run`
+(see `tests/smoke.ts`); `main.ts` is the only file that needs the platform SDK.
 
 ## Public vs private backend
 
@@ -99,7 +103,7 @@ dodil ignite invoke product-analytics --payload '{"action":"retention","offsets"
 dodil ignite invoke product-analytics --payload '{"action":"breakdown","event":"checkout_completed","property":"plan"}'
 ```
 
-## Verified live (`smoke.ts`)
+## Verified live (`tests/smoke.ts`)
 Against a real K3 bucket with a controlled 5-user dataset:
 - **funnel** `signup → activated → checkout` = **5 → 3 → 3** (respects step ordering).
 - **retention** cohort `2026-07-01` size 3, day-1 = 1; `2026-07-02` size 2, day-1 = 0.

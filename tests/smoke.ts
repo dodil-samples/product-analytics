@@ -1,7 +1,7 @@
 // Live smoke test: drive the analytics router against a throwaway K3 bucket.
 // Run via run_smoke.sh (which injects SMOKE_TOKEN/ORG + ANALYTICS_BUCKET from config).
-import { _setToken } from "./lib/auth.ts";
-import { handle } from "./lib/handler.ts";
+import { _setToken } from "../lib/auth.ts";
+import { handle } from "../handler.ts";
 
 _setToken(
   Deno.env.get("SMOKE_TOKEN")!,

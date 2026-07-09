@@ -9,6 +9,6 @@
     "@std/collections": "jsr:@std/collections@^1"
   },
   "tasks": {
-    "smoke": "deno run --allow-net --allow-env smoke.ts"
+    "smoke": "deno run --allow-net --allow-env tests/smoke.ts"
   }
 }
